@@ -1,0 +1,4 @@
+yowsup2
+promise
+python-axolotl
+Pillow

@@ -1,0 +1,4 @@
+DISCLAIMER
+===
+
+This is terrible, TERRIBLE, TERRRRIBLE code with ABSOLUTELY NO WARRENTY
