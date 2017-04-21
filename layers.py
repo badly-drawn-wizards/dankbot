@@ -18,6 +18,7 @@ class BotLayer(YowInterfaceLayer):
     @ProtocolEntityCallback("success")
     def onSuccess(self, success):
         print("Connected")
+        self.danksup.setName("DankBot")
 
     @ProtocolEntityCallback("notification")
     def onNotification(self, notification):
@@ -25,7 +26,7 @@ class BotLayer(YowInterfaceLayer):
 
     @ProtocolEntityCallback("failure")
     def onFailure(self, entity):
-        pass
+        print("Failure")
 
     @ProtocolEntityCallback("message")
     def onMessage(self, message):
