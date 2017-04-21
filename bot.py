@@ -7,6 +7,9 @@ from datetime import datetime
 from random import choice
 from tempfile import NamedTemporaryFile
 from os.path import expanduser
+from time import sleep
+from threading import Thread, RLock
+from collections import Counter
 import re
 import json
 
@@ -80,6 +83,86 @@ class DankMemeBank:
                 self.memes.append(meme)
 
         print("Got {} memes".format(len(self.memes)))
+
+class DankPoll(DankCommandProcessor):
+    MEME_COMMAND = re.compile("poll (?P<subcommand>\\w+)(\s+(?P<body>(.|\n)*))")
+    def __init__(self):
+        self.polls = {}
+        self.lock = RLock()
+    def process(self, ctxt, cmd):
+        match = self.MEME_COMMAND.match(cmd)
+        if match:
+            subcommand = match.group("subcommand")
+            body = match.group("body")
+            if subcommand == "create":
+                [identifier, description, *options] = body.split("\n")
+                if len(options) == 0:
+                    ctxt.reply("POLL MUST HAVE IDENTIFIER, DESCRIPTION AND CHOICES ON SEPARATE LINES.")
+                else:
+                    self.startPoll(ctxt, identifier, description, options)
+            elif subcommand == "vote":
+                [identifier, option] = body.split(" ", 2)
+                self.votePoll(ctxt, identifier, option)
+            else:
+                ctxt.reply("I DO NOT RECOGNIZE THE '{}' POLL SUBCOMMAND.".format(subcommand))
+        return bool(match)
+    def votePoll(self, ctxt, identifier, option):
+        with self.lock:
+            poll = self.polls.get(identifier)
+            if poll:
+                if option in poll["options"]:
+                    author = ctxt.getAuthor()
+                    previous = poll["votes"].get(author)
+                    poll["votes"][author] = option
+                    if previous:
+                        ctxt.reply("CHANGED VOTE FROM '{}' TO '{}'.".format(previous, option), target="individual")
+                    else:
+                        ctxt.reply("VOTED FOR '{}'.".format(option), target="individual")
+                else:
+                    ctxt.reply("'{}' IS NOT AN OPTION. OPTIONS ARE:\n{}".format(option, "\n".join(poll["options"])), target="individual")
+            else:
+                ctxt.reply("'{}' IS NOT A POLL.".format(identifier), target="individual")
+                if self.polls:
+                    ctxt.reply("OPEN POLLS ARE:\n{}".format("\n".join(self.polls.keys())), target="individual")
+    def startPoll(self, ctxt, identifier, description, options):
+        with self.lock:
+            if identifier in self.polls:
+                ctxt.reply("'{}' HAS ALREADY BEEN CREATED.".format(identifier))
+            else:
+                ctxt.reply("CREATED POLL '{}' FOR 5 MINUTES.".format(identifier))
+                self.polls[identifier] = {
+                    "description": description,
+                    "options": options,
+                    "votes": {}
+                }
+        def waitUntilClosing():
+            sleep(300)
+            self.closePoll(identifier, ctxt)
+        Thread(target=waitUntilClosing).start()
+    def closePoll(self, identifier, ctxt):
+        print("Closing poll, maybe")
+        with self.lock:
+            poll = self.polls[identifier]
+            votes = poll["votes"]
+            histogram = Counter(votes.values())
+            results = sorted((histogram[option], option) for option in poll["options"])
+            summary = "RESULTS ARE IN FOR POLL '{}':\n".format(identifier) \
+                    + "\n".join(["- {}: {}".format(option, count) for (count, option) in results])
+            ctxt.reply(summary)
+            del self.polls[identifier]
+
+class DankTimer(DankCommandProcessor):
+    MEME_COMMAND = re.compile("countdown (?P<seconds>[0-9]+)")
+    def process(self, ctxt, cmd):
+        match = self.MEME_COMMAND.match(cmd)
+        if match:
+            seconds = int(match.group("seconds"))
+            def timeout():
+                print("Sleeping for {} seconds".format(seconds))
+                sleep(seconds)
+                ctxt.reply("Done")
+            Thread(target=timeout).start()
+        return bool(match)
 
 class DankGroups(DankCommandProcessor):
     MEME_COMMAND = re.compile("group (?P<subcommand>\\w+)(\s+(?P<group>\\w+))?")
@@ -227,7 +310,7 @@ class DankBot(DankCommandProcessor):
         groups = self.config['groups']
         memeInfo = self.config['meme_info']
         admins = self.config['admins']
-        return DankChain([DankAdmin(groups, [Jid.normalize(jid) for jid in admins]), DankMeme(defaultBlacklist, groups, memeInfo), DankGroups(groups)])
+        return DankChain([DankAdmin(groups, [Jid.normalize(jid) for jid in admins]), DankMeme(defaultBlacklist, groups, memeInfo), DankGroups(groups), DankTimer(), DankPoll()])
 
     def process(self, ctxt, cmd):
         try:
