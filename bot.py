@@ -202,8 +202,8 @@ class DankMeme(DankCommandProcessor):
         if match:
             cmd = match.group("cmd")
             memeInfo = self.memeInfo.get(cmd.lower())
-            print("Meme is {}".format(cmd))
             if memeInfo:
+                print("Meme is {}".format(cmd))
                 shouldDoMeme = True
                 if ctxt.isGroupMessage():
                     for group, config in self.groups.items():
@@ -216,7 +216,7 @@ class DankMeme(DankCommandProcessor):
                             break
                     else:
                         group = None
-                        blacklist = DEFAULT_BLACKLIST
+                        blacklist = self.defaultBlacklist
                     print("Meme is {} and blacklist is {}".format(cmd, blacklist))
                     if cmd in blacklist:
                         shouldDoMeme = False
