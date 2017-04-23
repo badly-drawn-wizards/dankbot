@@ -47,7 +47,7 @@ class DankMemeBank:
             ext = url[-4:]
             location += ext
             urlretrieve(url, location) # Ultra mega terrible, I know. Just wait until you see the eval command.
-            promise = ctxt.reply(image=location)
+            promise = ctxt.reply(title, image=location)
         if submission_type == "youtube":
             url = data
             promise = ctxt.reply("{}\n{}".format(title, url))
